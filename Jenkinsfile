@@ -1,8 +1,9 @@
 pipeline {
     agent any
+
     environment {
-        REGISTRY = "your-dockerhub-username/demo"
-        IMAGE_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+        IMAGE_NAME = 'kireeti1234/java-hello-app'
+        TAG = 'latest'
     }
 
     stages {
@@ -12,50 +13,39 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Build with Maven') {
             steps {
-                sh 'mvn clean install'
+                sh 'mvn clean package'
+                sh 'ls -l target'
+
             }
         }
 
-        stage('Quality Gate') {
+        stage('Docker Build and Push') {
             when {
-                anyOf {
-                    branch pattern: "feature/.*", comparator: "REGEXP"
-                    branch 'develop'
-                }
-            }
-            steps {
-                timeout(time: 1, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        stage('Docker Build & Push') {
-            when {
-                branch 'develop'
+                branch 'Develop'
             }
             steps {
                 script {
-                    sh """
-                        docker build -t $REGISTRY:$IMAGE_TAG .
-                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                        docker push $REGISTRY:$IMAGE_TAG
-                    """
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentails') {
+                        def image = docker.build("${IMAGE_NAME}:${TAG}")
+                        image.push()
+                    }
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
             when {
-                branch 'develop'
+                branch 'Develop'
             }
             steps {
-                sh """
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-                """
+                //withCredentials([file(credentialsId: 'kubeconfig-cred-id', variable: 'KUBECONFIG')])
+                 withKubeConfig([credentialsId: 'kubeconfig'])
+                {
+                    sh 'kubectl apply -f deployment.yaml'
+                    sh 'kubectl apply -f service.yaml'
+                }
             }
         }
     }

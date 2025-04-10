@@ -1,12 +1,9 @@
 pipeline {
     agent any
-
-    tools {
-        maven 'Maven 3.8.1'
-    }
-
     environment {
-        IMAGE_NAME = 'kireeti1234/myapp'
+        REGISTRY = "your-dockerhub-username/demo"
+        IMAGE_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+        SONARQUBE_ENV = "SonarQube"
     }
 
     stages {
@@ -22,62 +19,59 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
+        stage('SonarQube Analysis') {
+            when {
+                anyOf {
+                    branch pattern: "feature/.*", comparator: "REGEXP"
+                    branch 'develop'
+                }
+            }
             steps {
-                script {
-                    dockerImage = docker.build("${IMAGE_NAME}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}")
+                withSonarQubeEnv("${SONARQUBE_ENV}") {
+                    sh 'mvn sonar:sonar'
                 }
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Quality Gate') {
             when {
                 anyOf {
-                    branch 'main'
-                    branch 'dev'
+                    branch pattern: "feature/.*", comparator: "REGEXP"
+                    branch 'develop'
                 }
             }
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh "docker push ${IMAGE_NAME}:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Docker Build & Push') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                script {
+                    sh """
+                        docker build -t $REGISTRY:$IMAGE_TAG .
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker push $REGISTRY:$IMAGE_TAG
+                    """
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
             when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                }
+                branch 'develop'
             }
             steps {
-                withKubeConfig([credentialsId: 'k8s-creds']) {
-                    script {
-                        if (env.BRANCH_NAME == 'main') {
-                            echo 'Deploying to production...'
-                            sh 'kubectl apply -f k8s/production.yaml'
-                        } else if (env.BRANCH_NAME == 'dev') {
-                            echo 'Deploying to staging...'
-                            sh 'kubectl apply -f k8s/staging.yaml'
-                        }
-                    }
-                }
+                sh """
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                """
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Build and deployment completed for branch: ${env.BRANCH_NAME}"
-        }
-        failure {
-            echo "Build or deployment failed for branch: ${env.BRANCH_NAME}"
         }
     }
 }

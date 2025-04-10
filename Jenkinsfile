@@ -27,7 +27,7 @@ pipeline {
             }
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentails') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentails') {
                         def image = docker.build("${IMAGE_NAME}:${TAG}")
                         image.push()
                     }

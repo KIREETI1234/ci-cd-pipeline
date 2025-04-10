@@ -3,7 +3,6 @@ pipeline {
     environment {
         REGISTRY = "your-dockerhub-username/demo"
         IMAGE_TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-        SONARQUBE_ENV = "SonarQube"
     }
 
     stages {
@@ -16,20 +15,6 @@ pipeline {
         stage('Build & Test') {
             steps {
                 sh 'mvn clean install'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            when {
-                anyOf {
-                    branch pattern: "feature/.*", comparator: "REGEXP"
-                    branch 'develop'
-                }
-            }
-            steps {
-                withSonarQubeEnv("${SONARQUBE_ENV}") {
-                    sh 'mvn sonar:sonar'
-                }
             }
         }
 

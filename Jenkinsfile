@@ -35,18 +35,18 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            when {
-                branch 'Develop'
-            }
-            steps {
-                //withCredentials([file(credentialsId: 'kubeconfig-cred-id', variable: 'KUBECONFIG')])
-                 withKubeConfig([credentialsId: 'kubeconfig'])
-                {
-                    sh 'kubectl apply -f deployment.yaml'
-                    sh 'kubectl apply -f service.yaml'
-                }
-            }
-        }
-    }
-}
+//         stage('Deploy to Kubernetes') {
+//             when {
+//                 branch 'Develop'
+//             }
+//             steps {
+//                 //withCredentials([file(credentialsId: 'kubeconfig-cred-id', variable: 'KUBECONFIG')])
+//                  withKubeConfig([credentialsId: 'kubeconfig'])
+//                 {
+//                     sh 'kubectl apply -f deployment.yaml'
+//                     sh 'kubectl apply -f service.yaml'
+//                 }
+//             }
+//         }
+//     }
+// }

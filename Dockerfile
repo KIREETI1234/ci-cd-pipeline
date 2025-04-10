@@ -1,5 +1,5 @@
 FROM openjdk:11-jre-slim
 WORKDIR /app
-COPY target/demo-1.0.0.jar app.jar
-EXPOSE 5000
+COPY target/jb-hello-world-maven-0.2.0.jar app.jar
+EXPOSE 9090
 ENTRYPOINT ["java", "-jar", "app.jar"]
